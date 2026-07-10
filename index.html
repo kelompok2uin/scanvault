@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ScanVault — Premium Document Scanner & Search Engine</title>
+  <!-- Google Fonts - Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Tesseract.js for OCR -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <!-- Dexie.js for IndexedDB document storage -->
+  <script src="https://cdn.jsdelivr.net/npm/dexie@4/dist/dexie.min.js"></script>
+  <!-- jsPDF for PDF generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-dark">
+  <div class="app-container">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-logo">
+          <i data-lucide="scan-face" class="logo-icon"></i>
+        </div>
+        <span class="brand-name">Scan<span>Vault</span></span>
+      </div>
+      
+      <nav class="sidebar-menu">
+        <button class="menu-item active" data-tab="dashboard">
+          <i data-lucide="layout-dashboard"></i>
+          <span>Dashboard</span>
+        </button>
+        <button class="menu-item" data-tab="library">
+          <i data-lucide="folder-open"></i>
+          <span>Perpustakaan</span>
+        </button>
+        <button class="menu-item" data-tab="scanner">
+          <i data-lucide="scan"></i>
+          <span>Scan Baru</span>
+        </button>
+        <button class="menu-item" data-tab="settings">
+          <i data-lucide="settings"></i>
+          <span>Pengaturan</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="theme-toggle-container">
+          <span class="theme-label text-muted">Tema</span>
+          <div class="theme-switch">
+            <button class="theme-btn active" data-theme="dark" title="Dark Mode">
+              <i data-lucide="moon"></i>
+            </button>
+            <button class="theme-btn" data-theme="light" title="Light Mode">
+              <i data-lucide="sun"></i>
+            </button>
+          </div>
+        </div>
+        <div class="user-profile flex-row-between w-full">
+          <div class="flex-row-gap-2">
+            <img src="https://api.dicebear.com/7.x/bottts/svg?seed=scanneruser" alt="User Avatar" class="profile-avatar">
+            <div class="profile-info">
+              <span class="profile-name">Zufar Gacor</span>
+              <span class="profile-tag">Admin</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Top Navbar Header -->
+      <header class="header">
+        <div class="header-left">
+          <h1 class="page-title" id="page-title">Dashboard</h1>
+          <p class="page-subtitle text-muted" id="page-subtitle">Selamat datang! Kelola dan cari dokumen hasil scan Anda.</p>
+        </div>
+        
+        <div class="header-actions">
+          <!-- Search Bar -->
+          <div class="search-box">
+            <i data-lucide="search" class="search-icon"></i>
+            <input type="text" id="global-search" placeholder="Cari isi dokumen, judul, atau tag...">
+          </div>
+          
+          <!-- Quick Action Scan -->
+          <button class="btn btn-primary btn-glow" id="quick-scan-btn">
+            <i data-lucide="plus"></i>
+            <span>Scan Dokumen</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Scrollable Panels Container -->
+      <div class="content-body">
+        
+        <!-- ================= DASHBOARD TAB ================= -->
+        <div id="tab-dashboard" class="tab-panel active">
+          <!-- Stat Cards -->
+          <div class="stats-grid">
+            <div class="card stat-card gradient-emerald">
+              <div class="stat-header">
+                <span class="stat-label">Total Dokumen</span>
+                <div class="stat-icon-wrapper"><i data-lucide="file-text"></i></div>
+              </div>
+              <div class="stat-value" id="stat-total-docs">0</div>
+              <div class="stat-footer text-muted" id="stat-recent-add">Belum ada dokumen baru</div>
+            </div>
+
+            <div class="card stat-card border-glow">
+              <div class="stat-header">
+                <span class="stat-label">Kategori Aktif</span>
+                <div class="stat-icon-wrapper"><i data-lucide="tags"></i></div>
+              </div>
+              <div class="stat-value" id="stat-total-categories">0</div>
+              <div class="stat-footer text-muted">Terbagi dalam folder terorganisir</div>
+            </div>
+
+            <div class="card stat-card border-glow">
+              <div class="stat-header">
+                <span class="stat-label">Kapasitas Penyimpanan</span>
+                <div class="stat-icon-wrapper"><i data-lucide="hard-drive"></i></div>
+              </div>
+              <div class="stat-value" id="stat-storage-percent">0%</div>
+              <div class="stat-footer">
+                <div class="progress-bar-container">
+                  <div class="progress-bar-fill" id="storage-progress" style="width: 0%;"></div>
+                </div>
+                <div class="progress-labels text-muted mt-1">
+                  <span id="stat-storage-bytes">0 KB / 5 MB</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mid Grid: Recent Uploads & Quick Dropzone -->
+          <div class="dashboard-mid-grid">
+            <!-- Recent Documents Table -->
+            <div class="card table-card">
+              <div class="card-header flex-row-between">
+                <div>
+                  <h3 class="card-title">Unggahan Terbaru</h3>
+                  <p class="card-desc text-muted">Akses cepat ke 5 dokumen yang baru saja di-scan</p>
+                </div>
+                <button class="btn btn-outline btn-sm" id="view-all-docs-btn">
+                  <span>Lihat Semua</span>
+                  <i data-lucide="arrow-right"></i>
+                </button>
+              </div>
+              <div class="table-responsive">
+                <table class="doc-table">
+                  <thead>
+                    <tr>
+                      <th>Judul Dokumen</th>
+                      <th>Kategori</th>
+                      <th>Tanggal Scan</th>
+                      <th>Ukuran</th>
+                      <th class="text-center">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dashboard-recent-table-body">
+                    <tr class="empty-row">
+                      <td colspan="5" class="text-center text-muted">
+                        Belum ada dokumen. Silakan unggah atau lakukan scan dokumen pertama Anda!
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Category Breakdown & Quick Actions -->
+            <div class="card flex-col-between card-right">
+              <div>
+                <h3 class="card-title">Kategori Dokumen</h3>
+                <p class="card-desc text-muted mb-4">Distribusi dokumen berdasarkan kategori</p>
+                <div class="category-list" id="category-distribution-list">
+                  <!-- Generated dynamically -->
+                  <div class="category-item-empty">Belum ada data kategori.</div>
+                </div>
+              </div>
+              
+              <div class="quick-scanner-promo">
+                <h4 class="promo-title">Butuh scan cepat?</h4>
+                <p class="promo-desc text-muted">Gunakan modul scanner kamera untuk menangkap dokumen secara langsung lewat webcam Anda.</p>
+                <button class="btn btn-secondary w-full justify-center" id="dashboard-scan-btn">
+                  <i data-lucide="camera"></i>
+                  <span>Buka Kamera Scan</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================= LIBRARY TAB ================= -->
+        <div id="tab-library" class="tab-panel">
+          <div class="card library-card">
+            <div class="card-header flex-column-md-row">
+              <div class="table-header-left">
+                <h3 class="card-title">Daftar Dokumen</h3>
+                <p class="card-desc text-muted">Kelola, cari isi teks (OCR), dan download dokumen Anda</p>
+              </div>
+              
+              <!-- Advanced Filter Bar -->
+              <div class="library-filters">
+                <div class="filter-search">
+                  <i data-lucide="search"></i>
+                  <input type="text" id="library-search" placeholder="Cari judul, isi teks, tag...">
+                </div>
+                <div class="filter-dropdowns">
+                  <select id="library-filter-category" class="custom-select-mini">
+                    <option value="all">Semua Kategori</option>
+                    <option value="Kwitansi/Struk">Kwitansi/Struk</option>
+                    <option value="Faktur/Invoice">Faktur/Invoice</option>
+                    <option value="Kontrak">Kontrak</option>
+                    <option value="Sertifikat">Sertifikat</option>
+                    <option value="Pribadi">Pribadi</option>
+                    <option value="Kerja">Kerja</option>
+                    <option value="Lainnya">Lainnya</option>
+                  </select>
+                  <select id="library-sort-by" class="custom-select-mini">
+                    <option value="newest">Terbaru</option>
+                    <option value="oldest">Terlama</option>
+                    <option value="name_asc">Nama (A-Z)</option>
+                    <option value="name_desc">Nama (Z-A)</option>
+                    <option value="size_desc">Ukuran Terbesar</option>
+                  </select>
+                </div>
+                <div class="view-toggle-buttons">
+                  <button class="view-btn active" id="view-grid-btn" title="Grid View">
+                    <i data-lucide="layout-grid"></i>
+                  </button>
+                  <button class="view-btn" id="view-list-btn" title="List View">
+                    <i data-lucide="list"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Documents Display Area (Grid / List Toggle) -->
+            <div class="documents-display grid-view" id="documents-container">
+              <!-- Empty state default -->
+              <div class="empty-state-container">
+                <i data-lucide="folder-search" class="empty-icon"></i>
+                <h3>Tidak Ada Dokumen</h3>
+                <p class="text-muted">Tidak ada dokumen yang cocok dengan pencarian Anda atau belum ada dokumen yang diunggah.</p>
+                <button class="btn btn-primary mt-4" id="empty-state-scan-btn">
+                  <i data-lucide="plus"></i>
+                  <span>Unggah Dokumen Baru</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================= SCANNER/UPLOAD TAB ================= -->
+        <div id="tab-scanner" class="tab-panel">
+          <div class="scanner-grid">
+            
+            <!-- Left Side: Scanner Preview / Dropzone -->
+            <div class="card scanner-preview-card">
+              <div class="card-header">
+                <h3 class="card-title">Input Dokumen</h3>
+                <p class="card-desc text-muted">Ambil foto lewat kamera atau unggah file gambar yang ada</p>
+                
+                <div class="input-mode-tabs mt-4">
+                  <button class="mode-tab active" id="tab-mode-upload">
+                    <i data-lucide="file-up"></i>
+                    <span>Unggah File</span>
+                  </button>
+                  <button class="mode-tab" id="tab-mode-camera">
+                    <i data-lucide="camera"></i>
+                    <span>Kamera Webcam</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="scanner-work-area">
+                <!-- Dropzone Area -->
+                <div id="upload-workzone" class="workzone-panel active">
+                  <div class="dropzone" id="file-dropzone">
+                    <i data-lucide="cloud-lightning" class="dropzone-icon"></i>
+                    <h3>Tarik & Lepas File Gambar</h3>
+                    <p class="text-muted">Mendukung JPEG, PNG, dan WebP (Maks 4MB untuk performa terbaik)</p>
+                    <span class="or-separator">atau</span>
+                    <button class="btn btn-outline" id="browse-file-btn">Pilih File</button>
+                    <input type="file" id="file-input" accept="image/*" class="hidden">
+                  </div>
+                </div>
+
+                <!-- Camera Webcam Area -->
+                <div id="camera-workzone" class="workzone-panel">
+                  <div class="camera-stream-container">
+                    <video id="webcam-video" autoplay playsinline muted class="webcam-feed"></video>
+                    <div class="camera-overlay">
+                      <div class="scan-guide-box"></div>
+                    </div>
+                    <div class="camera-error-msg hidden" id="camera-error">
+                      <i data-lucide="alert-triangle"></i>
+                      <p>Kamera tidak dapat diakses atau tidak ditemukan.</p>
+                      <button class="btn btn-sm btn-outline mt-2" id="retry-camera-btn">Coba Lagi</button>
+                    </div>
+                  </div>
+                  <div class="camera-controls mt-4">
+                    <div class="select-camera-wrapper">
+                      <select id="camera-select" class="custom-select-mini w-full">
+                        <option value="">Memuat kamera...</option>
+                      </select>
+                    </div>
+                    <button class="btn btn-primary btn-glow" id="capture-btn">
+                      <i data-lucide="aperture"></i>
+                      <span>Ambil Foto</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Image Editor / Filtering Stage (Visible once image is loaded/captured) -->
+                <div id="editor-workzone" class="workzone-panel">
+                  <div class="editor-canvas-container">
+                    <canvas id="editor-canvas"></canvas>
+                  </div>
+                  
+                  <div class="canvas-controls-wrapper">
+                    <!-- Filters Grid -->
+                    <div class="filter-controls-group">
+                      <span class="control-label text-muted">Filter Gambar:</span>
+                      <div class="filter-buttons">
+                        <button class="filter-btn active" data-filter="original">Original</button>
+                        <button class="filter-btn" data-filter="grayscale">Abu-Abu</button>
+                        <button class="filter-btn" data-filter="document">Dokumen (Tinggi Kontras)</button>
+                        <button class="filter-btn" data-filter="monochrome">B&W (Biner)</button>
+                      </div>
+                    </div>
+
+                    <!-- Fine-tune controls -->
+                    <div class="sliders-group mt-3">
+                      <div class="slider-control">
+                        <span class="text-muted">Kontras: <span id="contrast-val">0</span></span>
+                        <input type="range" id="contrast-slider" min="-100" max="100" value="0">
+                      </div>
+                      <div class="slider-control">
+                        <span class="text-muted">Kecerahan: <span id="brightness-val">0</span></span>
+                        <input type="range" id="brightness-slider" min="-100" max="100" value="0">
+                      </div>
+                    </div>
+
+                    <!-- Rotate Action -->
+                    <div class="actions-row-mini mt-3">
+                      <button type="button" class="btn btn-sm btn-secondary" id="add-page-btn" disabled>
+                        <i data-lucide="plus-square"></i>
+                        <span>Tambah Halaman</span>
+                      </button>
+                      <button class="btn btn-sm btn-outline" id="rotate-btn">
+                        <i data-lucide="rotate-cw"></i>
+                        <span>Putar 90°</span>
+                      </button>
+                      <button class="btn btn-sm btn-outline-danger" id="reset-image-btn">
+                        <i data-lucide="trash-2"></i>
+                        <span>Ulangi</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Right Side: Document Metadata & OCR Extractor -->
+            <div class="card scanner-metadata-card">
+              <h3 class="card-title">Informasi & Ekstraksi OCR</h3>
+              <p class="card-desc text-muted mb-4">Ekstrak teks dalam dokumen dan lengkapi detail informasi</p>
+
+              <!-- OCR Section -->
+              <div class="ocr-section-card">
+                <div class="ocr-status-header">
+                  <div class="ocr-status-title">
+                    <i data-lucide="cpu" class="ocr-icon"></i>
+                    <span>Mesin OCR Tesseract</span>
+                  </div>
+                  <span class="ocr-status-badge badge-idle" id="ocr-status-badge">Menunggu Gambar</span>
+                </div>
+                
+                <div class="ocr-actions-container mt-3">
+                  <button class="btn btn-secondary w-full justify-center" id="ocr-extract-btn" disabled>
+                    <i data-lucide="text-cursor-input"></i>
+                    <span>Ekstrak Teks Sekarang</span>
+                  </button>
+                </div>
+
+                <!-- OCR Loader/Progress -->
+                <div class="ocr-progress-container hidden" id="ocr-progress-area">
+                  <div class="progress-bar-container">
+                    <div class="progress-bar-fill progress-glow" id="ocr-progress-bar" style="width: 0%;"></div>
+                  </div>
+                  <div class="flex-row-between text-xs text-muted mt-1">
+                    <span id="ocr-status-text">Memproses dokumen...</span>
+                    <span id="ocr-progress-percent">0%</span>
+                  </div>
+                </div>
+
+                <div class="form-group mt-3">
+                  <label for="ocr-extracted-text">Teks Hasil Ekstraksi (Bisa Diedit)</label>
+                  <textarea id="ocr-extracted-text" class="form-control font-mono text-sm" rows="6" placeholder="Teks hasil scan otomatis akan muncul di sini setelah Anda melakukan ekstraksi OCR. Anda juga bisa mengetik manual jika file tidak memiliki gambar..."></textarea>
+                </div>
+              </div>
+
+              <!-- Metadata Form -->
+              <form id="doc-metadata-form" class="mt-4">
+                <div class="form-group">
+                  <label for="doc-title">Judul Dokumen <span class="text-danger">*</span></label>
+                  <input type="text" id="doc-title" class="form-control" placeholder="Contoh: Invoice Hosting JagoanWeb" required>
+                </div>
+
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label for="doc-category">Kategori <span class="text-danger">*</span></label>
+                    <select id="doc-category" class="form-control" required>
+                      <option value="" disabled selected>Pilih Kategori</option>
+                      <option value="Kwitansi/Struk">Kwitansi/Struk</option>
+                      <option value="Faktur/Invoice">Faktur/Invoice</option>
+                      <option value="Kontrak">Kontrak</option>
+                      <option value="Sertifikat">Sertifikat</option>
+                      <option value="Pribadi">Pribadi</option>
+                      <option value="Kerja">Kerja</option>
+                      <option value="Lainnya">Lainnya</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="doc-date">Tanggal Dokumen <span class="text-danger">*</span></label>
+                    <input type="date" id="doc-date" class="form-control" required>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="doc-tags">Tag (Pisahkan dengan koma)</label>
+                  <input type="text" id="doc-tags" class="form-control" placeholder="tag1, tag2, tag3">
+                </div>
+
+                <div class="form-group">
+                  <label for="doc-description">Catatan / Deskripsi Singkat</label>
+                  <textarea id="doc-description" class="form-control" rows="2" placeholder="Catatan tambahan mengenai dokumen ini..."></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-full justify-center mt-4 btn-glow" id="save-doc-btn" disabled>
+                  <i data-lucide="save"></i>
+                  <span>Simpan Dokumen ke Vault</span>
+                </button>
+              </form>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ================= SETTINGS TAB ================= -->
+        <div id="tab-settings" class="tab-panel">
+          <div class="card max-w-2xl mx-auto settings-card">
+            <h3 class="card-title text-2xl">Pengaturan Aplikasi</h3>
+            <p class="card-desc text-muted mb-6">Konfigurasi database lokal, backup data, dan manajemen penyimpanan.</p>
+            
+            <div class="settings-sections">
+              <!-- Section Backup & Restore -->
+              <div class="settings-section">
+                <h4 class="section-sub-title">Ekspor & Impor Data</h4>
+                <p class="text-muted text-sm mb-4">Unduh semua data dokumen beserta gambar yang tersimpan, atau pulihkan data dari file backup sebelumnya.</p>
+                
+                <div class="flex-row-gap-3">
+                  <button class="btn btn-outline" id="settings-export-btn">
+                    <i data-lucide="download"></i>
+                    <span>Ekspor Database (JSON)</span>
+                  </button>
+                  <button class="btn btn-outline" id="settings-import-trigger-btn">
+                    <i data-lucide="upload"></i>
+                    <span>Impor Database (JSON)</span>
+                  </button>
+                  <input type="file" id="settings-import-input" accept=".json" class="hidden">
+                </div>
+              </div>
+
+              <!-- Section Danger Zone -->
+              <div class="settings-section danger-zone mt-8">
+                <h4 class="section-sub-title text-danger">Danger Zone</h4>
+                <p class="text-muted text-sm mb-4">Tindakan berikut akan menghapus data secara permanen. Pastikan Anda telah membuat cadangan data jika diperlukan.</p>
+                
+                <div class="flex-row-gap-3">
+                  <button class="btn btn-outline-danger" id="settings-clear-btn">
+                    <i data-lucide="trash-2"></i>
+                    <span>Hapus Semua Dokumen</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Section About / Info -->
+              <div class="settings-section info-section mt-8">
+                <h4 class="section-sub-title">Tentang ScanVault</h4>
+                <p class="text-muted text-sm mb-2">Aplikasi ScanVault dikembangkan untuk memfasilitasi penyimpanan dokumen fisik digital menggunakan teknologi OCR berbasis web.</p>
+                <div class="system-specs text-xs text-muted">
+                  <div>Model Mesin OCR: <strong>Tesseract.js v5.0.0 (Indonesia)</strong></div>
+                  <div>Penyimpanan: <strong>IndexedDB melalui Dexie.js</strong></div>
+                  <div>Status Sistem: <span class="text-success">Aktif & Berjalan</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ================= DETAIL DOCUMENT MODAL ================= -->
+  <div class="modal-backdrop" id="doc-detail-modal">
+    <div class="modal-container modal-xl">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <h3 class="modal-title" id="modal-doc-title">Nama Dokumen</h3>
+          <span class="badge" id="modal-doc-category">Kategori</span>
+        </div>
+        <button class="modal-close-btn" id="close-detail-modal">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      
+      <div class="modal-body doc-modal-grid">
+        <!-- Document Image/View -->
+        <div class="modal-doc-preview">
+          <img id="modal-doc-img" src="" alt="Scan Preview">
+        </div>
+        
+        <!-- Document Data & Text -->
+        <div class="modal-doc-details">
+          <div class="metadata-block">
+            <h4 class="details-section-title">Informasi Dokumen</h4>
+            <div class="details-meta-grid">
+              <div class="meta-item">
+                <span class="meta-item-label text-muted">Tanggal Scan:</span>
+                <span class="meta-item-value" id="modal-doc-scan-date">-</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-item-label text-muted">Tanggal Dokumen:</span>
+                <span class="meta-item-value" id="modal-doc-date">-</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-item-label text-muted">Ukuran File:</span>
+                <span class="meta-item-value" id="modal-doc-size">-</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-item-label text-muted">Jumlah Halaman:</span>
+                <span class="meta-item-value" id="modal-doc-page-count">-</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-item-label text-muted">Tags:</span>
+                <div class="tags-container" id="modal-doc-tags">-</div>
+              </div>
+            </div>
+            
+            <div class="meta-item mt-3">
+              <span class="meta-item-label text-muted">Deskripsi / Catatan:</span>
+              <p class="meta-item-desc" id="modal-doc-desc">-</p>
+            </div>
+          </div>
+
+          <div class="extracted-text-block mt-4">
+            <div class="flex-row-between mb-2">
+              <h4 class="details-section-title mb-0">Teks Hasil Ekstraksi</h4>
+              <div class="text-block-actions">
+                <button class="btn btn-xs btn-outline" id="edit-modal-ocr-btn">
+                  <i data-lucide="edit-3"></i>
+                  <span id="edit-ocr-btn-text">Edit Teks</span>
+                </button>
+              </div>
+            </div>
+            <textarea id="modal-doc-ocr-text" class="form-control font-mono text-sm" rows="8" readonly></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer flex-row-between">
+        <button class="btn btn-outline-danger" id="delete-doc-btn">
+          <i data-lucide="trash-2"></i>
+          <span>Hapus Dokumen</span>
+        </button>
+        
+        <div class="flex-row-gap-2">
+          <button class="btn btn-outline" id="copy-doc-text-btn">
+            <i data-lucide="copy"></i>
+            <span>Salin Teks</span>
+          </button>
+          <button class="btn btn-primary btn-glow" id="download-pdf-btn">
+            <i data-lucide="file-down"></i>
+            <span>Unduh PDF</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Application Logic -->
+  <script src="app.js"></script>
+</body>
+</html>
