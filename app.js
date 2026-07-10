@@ -260,7 +260,6 @@ function setupEventListeners() {
   // Copy text, Delete and PDF actions
   document.getElementById('copy-doc-text-btn').addEventListener('click', copyExtractedText);
   document.getElementById('download-pdf-btn').addEventListener('click', downloadPdfDocument);
-  document.getElementById('compress-pdf-btn').addEventListener('click', downloadCompressedPdfDocument);
   document.getElementById('delete-doc-btn').addEventListener('click', deleteDocumentAction);
 
   // Settings features
@@ -1184,28 +1183,6 @@ async function deleteDocumentAction() {
 
 // Generate and export PDF using jsPDF
 function downloadPdfDocument() {
-  createPdfDocument(false);
-}
-
-async function downloadCompressedPdfDocument() {
-  const button = document.getElementById('compress-pdf-btn');
-  button.disabled = true;
-  button.innerHTML = '<i data-lucide="loader-circle"></i><span>Mengompres...</span>';
-  initializeLucide();
-
-  try {
-    await createPdfDocument(true);
-  } catch (error) {
-    console.error('Gagal mengompres PDF:', error);
-    alert('PDF gagal dikompres. Silakan coba lagi.');
-  } finally {
-    button.disabled = false;
-    button.innerHTML = '<i data-lucide="minimize-2"></i><span>Kompres & Unduh</span>';
-    initializeLucide();
-  }
-}
-
-async function createPdfDocument(compressed) {
   const doc = db.documents.find(d => d.id === activeDocumentId);
   if (!doc) return;
   
@@ -1217,11 +1194,7 @@ async function createPdfDocument(compressed) {
   });
   
   const pages = doc.pages && doc.pages.length ? doc.pages : [doc.image];
-  const exportPages = compressed
-    ? await Promise.all(pages.filter(Boolean).map(image => compressImageForPdf(image)))
-    : pages.filter(Boolean);
-
-  exportPages.forEach((image, index) => {
+  pages.filter(Boolean).forEach((image, index) => {
     if (index > 0) pdf.addPage();
     const properties = pdf.getImageProperties(image);
     const margin = 10;
@@ -1233,30 +1206,12 @@ async function createPdfDocument(compressed) {
     pdf.addImage(image, 'JPEG', (210 - width) / 2, (297 - height) / 2, width, height);
     pdf.setFontSize(8);
     pdf.setTextColor(90, 90, 90);
-    pdf.text(`${doc.title} — Halaman ${index + 1}/${exportPages.length}`, margin, 292);
+    pdf.text(`${doc.title} — Halaman ${index + 1}/${pages.length}`, margin, 292);
   });
   
   // Save output PDF
-  const baseName = doc.title.toLowerCase().replace(/[^a-z0-9]/g, '_');
-  const filename = `${baseName}${compressed ? '_compressed' : ''}.pdf`;
+  const filename = doc.title.toLowerCase().replace(/[^a-z0-9]/g, '_') + '.pdf';
   pdf.save(filename);
-}
-
-function compressImageForPdf(dataUrl) {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => {
-      const maxDimension = 1500;
-      const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.max(1, Math.round(image.width * scale));
-      canvas.height = Math.max(1, Math.round(image.height * scale));
-      canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL('image/jpeg', 0.55));
-    };
-    image.onerror = reject;
-    image.src = dataUrl;
-  });
 }
 
 // ================= SETTINGS CONTROLLERS =================
